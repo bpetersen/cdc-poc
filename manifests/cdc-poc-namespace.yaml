@@ -1,0 +1,8 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cdc-poc
+  labels:
+    app: cdc-poc
+    name: cdc-poc

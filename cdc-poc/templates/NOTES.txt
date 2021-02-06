@@ -1,0 +1,4 @@
+1. Get the status of Kafka Connect with the following command:
+kubectl describe KafkaConnect --namespace {{ .Release.Namespace }}
+2. Get the status of your Kafka Connectors with the following command:
+kubectl describe KafkaConnector --namespace {{ .Release.Namespace }}

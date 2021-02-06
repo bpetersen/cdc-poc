@@ -1,0 +1,43 @@
+---
+org: technology
+bc: cdc-poc
+
+KafkaConnect:
+  enabled: true
+  metricsEnabled: true
+  replicaCount: 1
+  schemaRegistryUrl: "http://cdc-poc-prerequisites-cp-schema-registry.kafka.svc.cluster.local:8081"
+  configTopicReplicationFactor: 1
+  offsetTopicReplicationFactor: 1
+  statusTopicReplicationFactor: 1
+  image: cdc-poc/strimzi-debezium-kafka-connect
+  bootstrapServers: "PLAINTEXT://cdc-poc-prerequisites-cp-kafka.kafka.svc.cluster.local:9092"
+  secrets:
+    volumeName: connector-config
+    secretName: db-credentials-debezium
+  podAnnotations: {}
+  podLabels: {}
+
+sourceConnectors:
+  db:
+    hostname: "host.docker.internal"
+    port: "5432"
+    user: "${file:/opt/kafka/external-configuration/connector-config/db-credentials-debezium.properties:pg_username}"
+    password: "${file:/opt/kafka/external-configuration/connector-config/db-credentials-debezium.properties:pg_password}"
+    dbname: "postgres"
+  changeEvents:
+    enabled: true
+    tasksMax: 1
+    tables:
+      - public.member
+      - public.team
+      - public.team_member
+    labels: {}
+    annotations: {}
+  domainEvents:
+    enabled: true
+    tasksMax: 1
+    tables:
+      - domain_event
+    labels: {}
+    annotations: {}

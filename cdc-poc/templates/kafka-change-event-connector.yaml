@@ -1,0 +1,49 @@
+{{- if .Values.sourceConnectors.changeEvents.enabled }}
+apiVersion: kafka.strimzi.io/v1alpha1
+kind: KafkaConnector
+metadata:
+  name: {{ template "cdc-poc.fullname" . }}-change-event-connector
+  labels:
+    app: {{ template "cdc-poc.name" . }}
+    # The strimzi.io/cluster label identifies the KafkaConnect instance
+    # in which to create this connector. That KafkaConnect instance
+    # must have the strimzi.io/use-connector-resources annotation
+    # set to true.
+    strimzi.io/cluster: {{ template "cdc-poc.fullname" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    {{- if .Values.sourceConnectors.changeEvents.labels }}
+    {{- toYaml .Values.sourceConnectors.changeEvents.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    strimzi.io/use-connector-resources: "true"
+    {{- if .Values.sourceConnectors.changeEvents.annotations }}
+    {{- toYaml .Values.sourceConnectors.changeEvents.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  class: io.debezium.connector.postgresql.PostgresConnector
+  tasksMax: {{ .Values.sourceConnectors.changeEvents.tasksMax }}
+  config:
+    name: {{ template "cdc-poc.fullname" . }}-change-event-connector
+    plugin.name: "pgoutput"
+    connector.class: "io.debezium.connector.postgresql.PostgresConnector"
+    tombstones.on.delete: "true"
+    database.hostname: {{ .Values.sourceConnectors.db.hostname | quote }}
+    database.port: {{ .Values.sourceConnectors.db.port | quote }}
+    database.user: {{ .Values.sourceConnectors.db.user | quote }}
+    database.password: {{ .Values.sourceConnectors.db.password | quote }}
+    database.dbname: {{ .Values.sourceConnectors.db.dbname | quote }}
+    database.server.name: {{ .Values.bc | quote }}
+    table.whitelist: {{ join "," .Values.sourceConnectors.changeEvents.tables | quote }}
+    slot.name: "change_event_source"
+    publication.name: "dbz_change_event_publication"
+    transforms: "unwrap, dropPrefix"
+    transforms.unwrap.type: "io.debezium.transforms.ExtractNewRecordState"
+    transforms.unwrap.drop.tombstones: "false"
+    transforms.dropPrefix.type: "org.apache.kafka.connect.transforms.RegexRouter"
+    transforms.dropPrefix.regex: ".*\\..*\\.(.*)"
+    transforms.dropPrefix.replacement: {{ template "cdc-poc.groupId" . }}.v1.$1
+    heartbeat.interval.ms: "30000"
+    heartbeat.action.query: "INSERT INTO cdc_heartbeat (id, last_heartbeat_at) VALUES (1, NOW()) ON CONFLICT(id) DO UPDATE SET last_heartbeat_at=EXCLUDED.last_heartbeat_at;"
+    
+{{- end }}
