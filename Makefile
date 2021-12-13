@@ -11,21 +11,7 @@ LOG := @sh -c '\
 	   echo "\n> $$1\n"; \
 	   printf ${NC}' VALUE
 
-## Only install the olm prerequisite if it doesn't exist
-OLM_EXISTS := $(shell kubectl get csv -n olm || echo 0)
-ifeq ($(OLM_EXISTS), 0)
-  $(info "OLM not found.  Now configured to install.")
-  strimzi_operator: olm_operator
-endif
-
-## Only install the strimzi operator if it doesn't exist
-STRIMZI_OPERATOR_EXISTS := $(shell kubectl get csv -n operators || echo 0)
-ifeq ($(STRIMZI_OPERATOR_EXISTS), 0)
-  $(info "Strimzi Operator not found.  Now configured to install.")
-  install_operators: strimzi_operator
-endif
-
-strimzi_setup: safety_check docker_compose_up strimzi_create_namespace db_setup create_db_credentials_in_k8s kafka_prerequisites install_operators
+strimzi_setup: safety_check olm_operator strimzi_operator docker_compose_up create_db_credentials_in_k8s kafka_prerequisites
 
 safety_check:
 	${LOG}  "Ensuring connection to dev k8s context"
@@ -34,12 +20,6 @@ safety_check:
 docker_compose_up:
 	${LOG}  "Bringing up source and destination DBs..."
 	docker-compose up -d
-
-db_setup:
-	${LOG}  "Setting up source database..."
-	sleep 2
-	until docker-compose exec source-db pg_isready; do sleep 1; done
-	psql -h localhost -d postgres -U postgres -f ./scripts/db-setup.sql
 
 build_image:
 	${LOG}  "Building kafka connect container..."
@@ -61,20 +41,19 @@ strimzi_create_namespace:
 	kubectl apply -f ./manifests/cdc-poc-namespace.yaml
 
 olm_operator:
-	${LOG}  "Installing operator lifecycle manager operator in kubernetes..."
-	kubectl apply -f https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v0.17.0/crds.yaml
-	kubectl apply -f https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v0.17.0/olm.yaml
+	$(LOG)  "Installing operator lifecycle manager operator in kubernetes..."
+	kubectl apply -f https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v0.18.2/crds.yaml
+	kubectl apply -f https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v0.18.2/olm.yaml
 	kubectl wait deployment -n olm --all --for condition=available --timeout 300s
 
-strimzi_operator:
-	${LOG}  "Installing strimzi operator in kubernetes...  This can take a few minutes to complete."
-	kubectl create -f https://operatorhub.io/install/strimzi-kafka-operator.yaml
-	## We can't use kubectl wait right off the bat because this line ^^ only creates the operator subscription which we can't use kubectl wait on.  Eventually the deployment (which we can wait on) will come up, but that can take a minute or so.
-	sleep 60
-	## Then once the deployment is starting, we'll wait for it to be available...
-	kubectl wait deployment -n operators --all --for condition=available --timeout 300s
-
-install_operators:
+strimzi_operator: olm_operator
+	$(LOG)  "Installing Strimzi operator in kubernetes..."
+	helm repo add strimzi https://strimzi.io/charts/
+	helm repo update
+	helm upgrade --install strimzi strimzi/strimzi-kafka-operator \
+	  --namespace operators \
+	  --set watchAnyNamespace=true \
+	  --version 0.20.0
 
 sinks:
 	${LOG}  "Installing jdbc sink connectors in kubernetes..."
@@ -107,3 +86,5 @@ nuke: safety_check
 	kubectl delete namespace metrics --ignore-not-found
 	kubectl delete namespace kafka --ignore-not-found
 
+list_topics:
+	docker compose exec kafka /kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
