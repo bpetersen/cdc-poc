@@ -1,5 +1,5 @@
 {{- if .Values.sourceConnectors.changeEvents.enabled }}
-apiVersion: kafka.strimzi.io/v1alpha1
+apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaConnector
 metadata:
   name: {{ template "cdc-poc.fullname" . }}-change-event-connector

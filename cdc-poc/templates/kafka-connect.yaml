@@ -1,5 +1,5 @@
 {{- if .Values.KafkaConnect.enabled }}
-apiVersion: kafka.strimzi.io/v1beta1
+apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaConnect
 metadata:
   name: {{ template "cdc-poc.fullname" . }}

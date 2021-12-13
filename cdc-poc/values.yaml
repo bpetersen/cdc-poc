@@ -4,7 +4,7 @@ bc: cdc-poc
 
 KafkaConnect:
   enabled: true
-  metricsEnabled: true
+  metricsEnabled: false
   replicaCount: 1
   schemaRegistryUrl: "http://cdc-poc-prerequisites-cp-schema-registry.kafka.svc.cluster.local:8081"
   configTopicReplicationFactor: 1
